@@ -22,16 +22,18 @@ parseTypeName = do
     remainingLetters <- many1 (satisfy (\char -> char >= 'A' && char <= 'z'))
     return (capitalLetter : remainingLetters)
 
-parseVariant :: ReadP [Char]
-parseVariant = do
-    string "|"
-    skipSpaces
+parseFirstVariant :: ReadP ElmType
+parseFirstVariant = do
     typename <- parseTypeName
-    return typename
+    return (ElmType
+        typename
+        [] -- associated types
+        [] -- variants
+        []) -- fields
 
-    
-parseVariant' :: ReadP ElmType
-parseVariant' = do
+parseVariant :: ReadP ElmType
+parseVariant = do
+    skipSpaces
     string "|"
     skipSpaces
     typename <- parseTypeName
@@ -41,8 +43,7 @@ parseVariant' = do
         [] -- variants
         []) -- fields
 
-
-parseSimpleTypeDef :: ReadP [Char]
+parseSimpleTypeDef :: ReadP ElmType
 parseSimpleTypeDef = do
     string "type"
     skipSpaces
@@ -50,23 +51,13 @@ parseSimpleTypeDef = do
     skipSpaces
     string "="
     skipSpaces
-    variants <- parseVariant
+    variant1 <- parseFirstVariant
     skipSpaces
-    return typename
-
-parseSimpleTypeDef' :: ReadP ElmType
-parseSimpleTypeDef' = do
-    string "type"
-    skipSpaces
-    typename <- parseTypeName
-    skipSpaces
-    string "="
-    skipSpaces
-    variants <- many1 parseVariant'
+    variants <- many parseVariant
     skipSpaces
     eof
     return (ElmType
         typename
         [] -- associated types
-        variants
+        (variant1 : variants)
         []) -- fields
