@@ -7,16 +7,9 @@ data Token = Pipe | Colon | TypeName [Char] | FieldName [Char] | ParLeft | ParRi
 
 parseTypeNameString :: ReadP [Char]
 parseTypeNameString = do
-    skipSpaces
     capitalLetter <- satisfy (\char -> char >= 'A' && char <= 'Z')
     remainingLetters <- many (satisfy (\char -> char >= 'A' && char <= 'z'))
     return (capitalLetter : remainingLetters)
-
-parseFieldNameString :: ReadP [Char]
-parseFieldNameString = do
-    first <- satisfy (\char -> char >= 'a' && char <= 'z')
-    rest <- many (satisfy (\char -> char >= 'A' && char <= 'z'))
-    return (first : rest)
 
 parseTypeName :: ReadP Token
 parseTypeName = do
@@ -25,7 +18,7 @@ parseTypeName = do
 
 parseFieldName :: ReadP Token
 parseFieldName = do
-    name <- parseFieldNameString
+    name <- many1 (satisfy (\char -> char >= 'a' && char <= 'z'))
     return (FieldName name)
 
 parseParLeft :: ReadP Token
@@ -70,41 +63,21 @@ parseRHS = do
     tokens <- many1 parseToken
     return tokens
 
--- no support for associativitiy precedence yet
-parseSimple :: ReadP ElmSimple
-parseSimple = do
-    name <- parseTypeNameString
-    associated <- many parseTypeNameString
-    return ( ElmSimple name (map (\str -> ElmSimple str []) associated) )
 
-
-
--- no support for fields of types with associated types yet
-parseFieldDeclaration :: ReadP (String, ElmSimple)
+parseFieldDeclaration :: ReadP ([Char], [Char])
 parseFieldDeclaration = do
-    skipSpaces
-    fieldname <- parseFieldNameString
+    fieldname <- parseFieldName
     skipSpaces
     satisfy (\char -> char == ':')
     skipSpaces
-    fieldtype <- parseSimple
-    skipSpaces
-    return (fieldname, fieldtype)
+    typename <- parseTypeNameString
+    return (fieldname, typename)
 
--- includes field separator character ',' for fields 1..n
-fieldSeparator :: ReadP Char
-fieldSeparator =
-    satisfy (\char -> char == ',')
-
--- no support for extensible types yet
-parseAnonRecord :: ReadP ElmAnonRecord
-parseAnonRecord = do
+parseRHSAlias :: ReadP [Token]
+parseRHSAlias = do
     satisfy (\char -> char == '{')
     skipSpaces
-    fields <- sepBy1 parseFieldDeclaration fieldSeparator
-    skipSpaces
-    satisfy (\char -> char == '}')
-    return (ElmAnonRecord fields)
+    fields <- many parseFieldDeclaration
     
 
 parseLHS :: ReadP [Char]
@@ -124,43 +97,22 @@ parseTypeDef = do
     eof
     return (name, rhs)
 
-data ElmType = BuiltIn ElmBuiltIn
-    | Simple ElmSimple
-    | Record ElmRecord
-    | AnonRecord ElmAnonRecord
-    | SumType ElmSumType
-    deriving Show
-
--- ElmSimple name associated
-data ElmSimple = ElmSimple String [ElmSimple] deriving Show
-
--- ElmRecord name associated fields
-data ElmRecord = ElmRecord String [ElmSimple] [(String, ElmSimple)] deriving Show
-
--- yeah this is kinda wonky
--- ElmAnonRecord fields
-data ElmAnonRecord = ElmAnonRecord [(String, ElmSimple)] deriving Show
-
--- ElmSumType name associated variants
-data ElmSumType = ElmSumType String [ElmSimple] [ElmType] deriving Show
-
-data ElmBuiltIn = ElmString | ElmInt | ElmFloat | ElmBool | ElmTuple [ElmType] | ElmList ElmType
-    deriving Show
-    
+tryToElmType :: ([Char], [Token]) -> Maybe ElmType
+tryToElmType (name, ast) =
+    let
+        variants = Data.List.Split.splitOn [Pipe] ast
+    in
+        Just (
+            ElmType
+            name
+            []
+            []
+            [] )
 
 
 
 
 
--- recursive data structure approach
--- data Expr = JustType ElmType | WithAssociated Type [Type] | Alternative Expr Expr | Parantheses Expr Expr | End
--- data Kinds = Simple String | Record ElmRecord
-
-
-
-
-
--- weird approach 
 
 
 -- ergonomic wrapper around pipeSplit'
@@ -202,3 +154,30 @@ pipeSplit' (head:rest) (bracehead:bracerest) section acc =
 -- semantics (head:rest) (bracehead:bracerest) acc =
 --     case head of
 --         Pipe -> if 
+
+
+    
+
+
+
+data ElmBuiltIn = ElmString | ElmInt | ElmFloat
+    deriving Show
+
+data ElmType = ElmType
+    { name :: [Char]
+    , associated :: [ElmType]
+    , variants :: [ElmType]
+    , fields :: [([Char],ElmType)]
+    } | ElmBuiltIn
+    deriving Show
+
+data Expr = Alternative String Expr | Parantheses Expr Expr | End
+
+
+
+data Kinds = Simple String | Record ElmRecord
+
+ElmRecord = {
+    { name :: [Char]
+    , fields :: [([Char], ElmType)] -- consider using map instead
+    }
