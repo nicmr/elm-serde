@@ -1,15 +1,15 @@
 import Text.ParserCombinators.ReadP
 
 
--- parsers for top level sum type alternatives
-type SumType = [ElmType]
+-- parsers for the rhs of a sum type declaration : the alternative constructors
+type SumTypeRHS = [ElmConstruct]
 
 -- parses a sumtype
 -- a | b | c
-sumtype :: ReadP SumType
+sumtype :: ReadP SumTypeRHS
 sumtype = do
     skipSpaces
-    types <- sepBy1 mytree pipe
+    types <- sepBy1 constructorRoot pipe
     return types
 
 -- parses if next non-whitespace character is a pipe
@@ -19,36 +19,37 @@ pipe = do
 
 -- parsers for the following type parameter associativity
 -- A
--- ElmType 'A' []
+-- ElmConstruct 'A' []
 
 -- A B C
--- ElmType 'A' [ElmType 'B' [], ElmType 'C']
+-- ElmConstruct 'A' [ElmConstruct 'B' [], ElmConstruct 'C']
 
 -- A (B C)
--- ElmType A [(ElmType B [ElmType C []])]
-data ElmType = ElmType String [ElmType] deriving Show
+-- ElmConstruct A [(ElmConstruct B [ElmConstruct C []])]
+data ElmConstruct = ElmConstruct String [ElmConstruct] deriving Show
 
-assoctree = myassociated +++ brackets mytype
+constructorRoot = withTypeVars +++ parantheses constructorRoot
 
-mytree = mytype +++ brackets mytype
+-- constructor type variables can only have their own type variables if surrounded by parantheses
+constructorVariable = noTypeVars +++ parantheses constructorRoot
 
--- parses a type that can have type parameters
-mytype :: ReadP ElmType
-mytype = do
+-- parses a constructor that can have type variables / type constants
+withTypeVars :: ReadP ElmConstruct
+withTypeVars = do
     skipSpaces
     name <- parseTypeName
-    assoc <- many assoctree
-    return (ElmType name assoc)
+    vars <- many constructorVariable
+    return (ElmConstruct name vars)
 
--- parses a type that can not have type parameters
-myassociated :: ReadP ElmType
-myassociated = do
+-- parses a constructor that can *not* have type variables / type constants
+noTypeVars :: ReadP ElmConstruct
+noTypeVars = do
     skipSpaces
     name <- parseTypeName
-    return (ElmType name [])
+    return (ElmConstruct name [])
 
--- parses brackets
-brackets p = do
+-- parses parantheses
+parantheses p = do
     skipSpaces
     char '('
     r <- p
@@ -56,7 +57,7 @@ brackets p = do
     char ')'
     return r
 
--- parses a type name with correct capitalisation: PascalCase
+-- parses a type/constructor name with correct capitalisation: PascalCase
 parseTypeName :: ReadP [Char]
 parseTypeName = do
     skipSpaces
