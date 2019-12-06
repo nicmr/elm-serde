@@ -65,13 +65,19 @@ parseToken = do
                 parseColon <|> parseBraceLeft <|> parseBraceRight
     return token
 
-parseRHS :: ReadP [Token]
-parseRHS = do
-    tokens <- many1 parseToken
-    return tokens
+placeholder :: ReadP ElmType
+placeholder = do
+    return (ElmBuiltIn ElmBool)
+
+parseRHS :: Alias -> ReadP ElmType
+parseRHS alias = do
+    elmtype <- case alias of
+        NoAlias -> placeholder
+        YesAlias -> parseSimple <|> parseAnonRecord
+    return elmtype
 
 -- no support for associativitiy precedence yet
-parseSimple :: ReadP ElmSimple
+parseSimple :: ReadP ElmType
 parseSimple = do
     name <- parseTypeNameString
     associated <- many parseTypeNameString
@@ -80,7 +86,7 @@ parseSimple = do
 
 
 -- no support for fields of types with associated types yet
-parseFieldDeclaration :: ReadP (String, ElmSimple)
+parseFieldDeclaration :: ReadP (String, ElmType)
 parseFieldDeclaration = do
     skipSpaces
     fieldname <- parseFieldNameString
@@ -97,7 +103,7 @@ fieldSeparator =
     satisfy (\char -> char == ',')
 
 -- no support for extensible types yet
-parseAnonRecord :: ReadP ElmAnonRecord
+parseAnonRecord :: ReadP ElmType
 parseAnonRecord = do
     satisfy (\char -> char == '{')
     skipSpaces
@@ -105,100 +111,106 @@ parseAnonRecord = do
     skipSpaces
     satisfy (\char -> char == '}')
     return (ElmAnonRecord fields)
+
+parseAlias :: ReadP Alias
+parseAlias = do
+    string "alias"
+    return YesAlias
+
+noAlias :: ReadP Alias
+noAlias = do
+    return NoAlias
+
+
+
+-- represents ast on right hand side
+data Tree = Branch Tree Tree | Leaf ElmType deriving Show
+
+
+leaf :: ReadP Tree
+brackets p = do
+    skipSpaces
+    char '('
+    skipSpaces
+    r <- p
+    skipSpaces
+    char ')'
+    return r
+
+leaf :: ReadP Tree
+leaf = do
+    simple <- parseSimple
+    return (Leaf simple)
+
+tree :: ReadP Tree
+tree = leaf +++ branch
+
+branch :: ReadP Tree
+branch = do
+    a <- leaf +++ brackets tree
+    skipSpaces
+    char '|'
+    skipSpaces
+    b <- tree
+    return (Branch a b)
+
     
 
-parseLHS :: ReadP [Char]
+parseLHS :: ReadP (String, Alias)
 parseLHS = do
     skipSpaces
     string "type"
+    alias <- parseAlias <|> noAlias
     skipSpaces
     name <- parseTypeNameString
-    return name
+    return (name, alias)
 
-parseTypeDef :: ReadP ([Char], [Token])
+
+-- change to: (String, Tree), then write function to collapse Tree and build FullyQualified
+parseTypeDef :: ReadP (String, [ElmType])
 parseTypeDef = do
-    name <- parseLHS
+    (name, alias) <- parseLHS
     skipSpaces
     satisfy (\char -> char == '=')
-    rhs <- parseRHS
+    rhs <- parseRHS alias
     eof
-    return (name, rhs)
+    return (name, [rhs])
 
-data ElmType = BuiltIn ElmBuiltIn
-    | Simple ElmSimple
-    | Record ElmRecord
-    | AnonRecord ElmAnonRecord
-    | SumType ElmSumType
+data Alias = YesAlias | NoAlias
+
+data FullyQualified = FullyQualified String [ElmType]
+
+
+data BuiltIn = ElmString | ElmInt | ElmFloat | ElmBool | ElmTuple [ElmType] | ElmList ElmType
     deriving Show
 
--- ElmSimple name associated
-data ElmSimple = ElmSimple String [ElmSimple] deriving Show
-
--- ElmRecord name associated fields
-data ElmRecord = ElmRecord String [ElmSimple] [(String, ElmSimple)] deriving Show
-
--- yeah this is kinda wonky
--- ElmAnonRecord fields
-data ElmAnonRecord = ElmAnonRecord [(String, ElmSimple)] deriving Show
-
--- ElmSumType name associated variants
-data ElmSumType = ElmSumType String [ElmSimple] [ElmType] deriving Show
-
-data ElmBuiltIn = ElmString | ElmInt | ElmFloat | ElmBool | ElmTuple [ElmType] | ElmList ElmType
+data ElmType = ElmBuiltIn BuiltIn
+    -- ElmSimple name associated
+    | ElmSimple String [ElmType]
+    -- ElmRecord name associated fields
+    | ElmRecord String [ElmType] [(String, ElmType)]
+    -- ElmAnonRecord fields
+    | ElmAnonRecord [(String, ElmType)]
     deriving Show
-    
 
+-- data ElmType = BuiltIn ElmBuiltIn
+--     | Simple ElmSimple
+--     | Record ElmRecord
+--     | AnonRecord ElmAnonRecord
+--     | SumType ElmSumType
+--     deriving Show
 
+-- data ElmBuiltIn = ElmString | ElmInt | ElmFloat | ElmBool | ElmTuple [ElmType] | ElmList ElmType
+--     deriving Show
+-- -- ElmSimple name associated
+-- data ElmSimple = ElmSimple String [ElmSimple] deriving Show
 
+-- -- ElmRecord name associated fields
+-- data ElmRecord = ElmRecord String [ElmSimple] [(String, ElmSimple)] deriving Show
 
+-- -- yeah this is kinda wonky
+-- -- ElmAnonRecord fields
+-- data ElmAnonRecord = ElmAnonRecord [(String, ElmSimple)] deriving Show
 
--- recursive data structure approach
--- data Expr = JustType ElmType | WithAssociated Type [Type] | Alternative Expr Expr | Parantheses Expr Expr | End
--- data Kinds = Simple String | Record ElmRecord
-
-
-
-
-
--- weird approach 
-
-
--- ergonomic wrapper around pipeSplit'
--- will split into variants at pipes, unless the pipe is inside a record definition
-pipeSplit :: [Token] -> Maybe [[Token]]
-pipeSplit ast =
-    pipeSplit' ast [] [] []
-
--- paramters are: rest, braces, section, accumulator
-pipeSplit' :: [Token] -> [Token] -> [Token] -> [[Token]] -> Maybe [[Token]]
-
--- pipeSplit' [] [] [] [] = [] -- should be handled by case below
--- pipeSplit' [] [] [] acc = acc -- should be handled by case below
-pipeSplit' [] [] section acc = Just (section:acc)
-
--- context: no braces
-pipeSplit' (head:rest) [] section acc =
-    case head of
-        Pipe -> pipeSplit' rest [] [] (section:acc) -- pipe separates variants -> section is finished
-        BraceLeft -> pipeSplit' rest (BraceLeft:[]) (head:section) acc -- place new brace on stack
-        BraceRight -> Nothing -- braceright with empty stack should be impossible
-        t -> pipeSplit' rest [] (t:section) acc
-
--- context: braces (inside record type)
-pipeSplit' (head:rest) (bracehead:bracerest) section acc =
-    case head of
-        Pipe -> pipeSplit' rest (bracehead:bracerest) (head:section) acc
-        BraceLeft -> Nothing -- there is no way to nest records in records (right?)
-        BraceRight -> pipeSplit' rest bracerest (head:section) acc
-        t -> pipeSplit' rest [] (t:section) acc
-
-
--- semantics :: [Token] -> [Token] -> [ElmType] -> Maybe [ElmType]
--- semantics [] [] acc = Just acc
--- semantics (head:rest) [] acc =
---     case head of
---         Pipe -> semantics [] acc
-
--- semantics (head:rest) (bracehead:bracerest) acc =
---     case head of
---         Pipe -> if 
+-- -- ElmSumType name associated variants
+-- data ElmSumType = ElmSumType String [ElmSimple] [ElmType] deriving Show

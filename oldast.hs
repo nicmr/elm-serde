@@ -110,56 +110,6 @@ tryToElmType (name, ast) =
             [] )
 
 
-
-
-
-
-
--- ergonomic wrapper around pipeSplit'
--- will split into variants at pipes, unless the pipe is inside a record definition
-pipeSplit :: [Token] -> Maybe [[Token]]
-pipeSplit ast =
-    pipeSplit' ast [] [] []
-
--- paramters are: rest, braces, section, accumulator
-pipeSplit' :: [Token] -> [Token] -> [Token] -> [[Token]] -> Maybe [[Token]]
-
--- pipeSplit' [] [] [] [] = [] -- should be handled by case below
--- pipeSplit' [] [] [] acc = acc -- should be handled by case below
-pipeSplit' [] [] section acc = Just (section:acc)
-
--- context: no braces
-pipeSplit' (head:rest) [] section acc =
-    case head of
-        Pipe -> pipeSplit' rest [] [] (section:acc) -- pipe separates variants -> section is finished
-        BraceLeft -> pipeSplit' rest (BraceLeft:[]) (head:section) acc -- place new brace on stack
-        BraceRight -> Nothing -- braceright with empty stack should be impossible
-        t -> pipeSplit' rest [] (t:section) acc
-
--- context: braces (inside record type)
-pipeSplit' (head:rest) (bracehead:bracerest) section acc =
-    case head of
-        Pipe -> pipeSplit' rest (bracehead:bracerest) (head:section) acc
-        BraceLeft -> Nothing -- there is no way to nest records in records (right?)
-        BraceRight -> pipeSplit' rest bracerest (head:section) acc
-        t -> pipeSplit' rest [] (t:section) acc
-
-
--- semantics :: [Token] -> [Token] -> [ElmType] -> Maybe [ElmType]
--- semantics [] [] acc = Just acc
--- semantics (head:rest) [] acc =
---     case head of
---         Pipe -> semantics [] acc
-
--- semantics (head:rest) (bracehead:bracerest) acc =
---     case head of
---         Pipe -> if 
-
-
-    
-
-
-
 data ElmBuiltIn = ElmString | ElmInt | ElmFloat
     deriving Show
 
