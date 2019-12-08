@@ -13,10 +13,6 @@ parseElmType = do
     skipSpaces
     char '='
     skipSpaces
-    -- elmtype <- case alias of
-    --     True -> ElmAlias name constructorRoot
-    --     False -> ElmNewType name sumtypeRHS
-    -- return elmtype
     case alias of
         True -> do
             { rhs <- constructorRoot
@@ -26,21 +22,19 @@ parseElmType = do
             { rhs <- sumtypeRHS
             ; return (ElmNewType name rhs)
             }
-            
-
-    -- return (ElmAlias name constructorRoot)
 
 -- parsers for the left hand side of a type declaration
 lhs :: ReadP (String, Bool)
 lhs = do
     skipSpaces
     string "type"
-    -- al <- alias +++ false
+    -- not sure if this makes a difference
+    -- alias <- parseAlias +++ false
     alias <- parseAlias <++ false
     skipSpaces
     name <- parseTypeName
     -- skipSpaces
-    -- add support for type variables here
+    -- TODO: add support for type variables here
     return (name, alias)
 
 false :: ReadP Bool
@@ -70,20 +64,22 @@ pipe = do
     skipSpaces
     char '|'
 
+
+data ElmConstruct = ElmConstruct String [ElmConstruct] deriving Show
 -- parsers for the following type parameter associativity
 -- A
 -- ElmConstruct 'A' []
 
 -- A B C
--- ElmConstruct 'A' [ElmConstruct 'B' [], ElmConstruct 'C']
+-- ElmConstruct 'A' [ElmConstruct 'B' [], ElmConstruct 'C' []]
 
 -- A (B C)
 -- ElmConstruct A [(ElmConstruct B [ElmConstruct C []])]
-data ElmConstruct = ElmConstruct String [ElmConstruct] deriving Show
 
+-- parses a single constructor with all its type variables or constants
 constructorRoot = withTypeVars +++ parantheses constructorRoot
 
--- constructor type variables can only have their own type variables if surrounded by parantheses
+-- type variables can only have their own type variables if surrounded by parantheses
 constructorVariable = noTypeVars +++ parantheses constructorRoot
 
 -- parses a constructor that can have type variables or type constants
