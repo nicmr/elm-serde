@@ -65,7 +65,9 @@ pipe = do
     char '|'
 
 
-data ElmConstruct = ElmConstruct String [ElmConstruct] deriving Show
+data ElmConstruct =
+    ElmConstruct String [ElmConstruct]
+    | ElmRecordConstruct (Maybe String) [(String, ElmConstruct)] deriving Show
 -- parsers for the following type parameter associativity
 -- A
 -- ElmConstruct 'A' []
@@ -113,3 +115,40 @@ parseTypeName = do
     capitalLetter <- satisfy (\char -> char >= 'A' && char <= 'Z')
     remainingLetters <- many (satisfy (\char -> char >= 'A' && char <= 'z'))
     return (capitalLetter : remainingLetters)
+
+
+-- parsers for elm records
+
+-- no support for extensible types yet
+-- no support for named records yet
+parseRecordBlock :: ReadP ElmConstruct
+parseRecordBlock = do
+    satisfy (\char -> char == '{')
+    skipSpaces
+    fields <- sepBy1 parseFieldDeclaration fieldSeparator
+    skipSpaces
+    satisfy (\char -> char == '}')
+    return (ElmRecordConstruct Nothing fields)
+    
+-- includes field separator character ',' for fields 1..n
+fieldSeparator :: ReadP Char
+fieldSeparator = do
+    satisfy (\char -> char == ',')
+
+-- no support for fields of types with associated types yet
+parseFieldDeclaration :: ReadP (String, ElmConstruct)
+parseFieldDeclaration = do
+    skipSpaces
+    fieldname <- parseFieldName
+    skipSpaces
+    satisfy (\char -> char == ':')
+    skipSpaces
+    fieldtype <- constructorRoot
+    skipSpaces
+    return (fieldname, fieldtype)
+
+parseFieldName :: ReadP String
+parseFieldName = do
+    first <- satisfy (\char -> char >= 'a' && char <= 'z')
+    rest <- many (satisfy (\char -> char >= 'A' && char <= 'z'))
+    return (first : rest)
