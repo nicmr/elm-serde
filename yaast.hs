@@ -1,13 +1,66 @@
 import Text.ParserCombinators.ReadP
 
+data ElmType =
+    -- ElmNewtype name variants
+    ElmNewType String [ElmConstruct]
+    -- ElmAlias name aliasTo
+    | ElmAlias String ElmConstruct
+    deriving Show
 
--- parsers for the rhs of a sum type declaration : the alternative constructors
+parseElmType :: ReadP ElmType
+parseElmType = do
+    (name, alias) <- lhs
+    skipSpaces
+    char '='
+    skipSpaces
+    -- elmtype <- case alias of
+    --     True -> ElmAlias name constructorRoot
+    --     False -> ElmNewType name sumtypeRHS
+    -- return elmtype
+    case alias of
+        True -> do
+            { rhs <- constructorRoot
+            ; return (ElmAlias name rhs)
+            }
+        False -> do
+            { rhs <- sumtypeRHS
+            ; return (ElmNewType name rhs)
+            }
+            
+
+    -- return (ElmAlias name constructorRoot)
+
+-- parsers for the left hand side of a type declaration
+lhs :: ReadP (String, Bool)
+lhs = do
+    skipSpaces
+    string "type"
+    -- al <- alias +++ false
+    alias <- parseAlias <++ false
+    skipSpaces
+    name <- parseTypeName
+    -- skipSpaces
+    -- add support for type variables here
+    return (name, alias)
+
+false :: ReadP Bool
+false = do
+    return False
+
+parseAlias :: ReadP Bool
+parseAlias = do
+    skipSpaces
+    string "alias"
+    return True
+
+
+-- parsers for the rhs of a sum type declaration: several different constructors
 type SumTypeRHS = [ElmConstruct]
 
--- parses a sumtype
+-- parses a sumtypeRHS
 -- a | b | c
-sumtype :: ReadP SumTypeRHS
-sumtype = do
+sumtypeRHS :: ReadP SumTypeRHS
+sumtypeRHS = do
     skipSpaces
     types <- sepBy1 constructorRoot pipe
     return types
@@ -33,7 +86,7 @@ constructorRoot = withTypeVars +++ parantheses constructorRoot
 -- constructor type variables can only have their own type variables if surrounded by parantheses
 constructorVariable = noTypeVars +++ parantheses constructorRoot
 
--- parses a constructor that can have type variables / type constants
+-- parses a constructor that can have type variables or type constants
 withTypeVars :: ReadP ElmConstruct
 withTypeVars = do
     skipSpaces
@@ -41,7 +94,7 @@ withTypeVars = do
     vars <- many constructorVariable
     return (ElmConstruct name vars)
 
--- parses a constructor that can *not* have type variables / type constants
+-- parses a constructor that can *not* have type variables or type constants
 noTypeVars :: ReadP ElmConstruct
 noTypeVars = do
     skipSpaces
