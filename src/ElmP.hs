@@ -1,3 +1,9 @@
+module ElmP
+    ( parseElmType
+    , ElmType
+    , parseString
+    ) where
+
 import Text.ParserCombinators.ReadP
 
 data ElmType =
@@ -6,6 +12,11 @@ data ElmType =
     -- ElmAlias name aliasTo
     | ElmAlias String ElmConstruct
     deriving Show
+
+parseString :: String -> [(ElmType, String)]
+parseString s =
+    readP_to_S parseElmType s
+
 
 parseElmType :: ReadP ElmType
 parseElmType = do
