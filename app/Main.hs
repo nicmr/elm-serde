@@ -6,7 +6,8 @@ example = "type Foo = Bar | Baz { id : Int}"
 
 main :: IO ()
 main = do
-    -- (parsed, rest) <- last . ElmP.parseString example
+    let (parsed, rest) = last $ ElmP.parseString example
     putStrLn example
     putStrLn "Parsing Elm types..."
-    print example
+    print parsed
+    return ()
