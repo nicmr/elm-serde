@@ -15,7 +15,7 @@ parseElmType = do
     skipSpaces
     case alias of
         True -> do
-            { rhs <- constructorRoot
+            { rhs <- constructorRoot +++ parseAnonRecord
             ; return (ElmAlias name rhs)
             }
         False -> do
@@ -56,7 +56,7 @@ type SumTypeRHS = [ElmConstruct]
 sumtypeRHS :: ReadP SumTypeRHS
 sumtypeRHS = do
     skipSpaces
-    types <- sepBy1 constructorRoot pipe
+    types <- sepBy1 (constructorRoot +++ parseNamedRecord) pipe
     return types
 
 -- parses if next non-whitespace character is a pipe
@@ -66,8 +66,11 @@ pipe = do
 
 
 data ElmConstruct =
+    -- ElmConstruct name typeVars
     ElmConstruct String [ElmConstruct]
+    -- ElmRecordConstruct (maybe name) [(fieldname, fieldType)]
     | ElmRecordConstruct (Maybe String) [(String, ElmConstruct)] deriving Show
+    
 -- parsers for the following type parameter associativity
 -- A
 -- ElmConstruct 'A' []
@@ -119,16 +122,32 @@ parseTypeName = do
 
 -- parsers for elm records
 
+parseNamedRecord :: ReadP ElmConstruct
+parseNamedRecord = do
+    skipSpaces
+    name <- parseTypeName
+    fields <- parseRecordBlock
+    return (ElmRecordConstruct (Just name) fields)
+
+
+parseAnonRecord :: ReadP ElmConstruct
+parseAnonRecord = do
+    skipSpaces
+    fields <- parseRecordBlock
+    return (ElmRecordConstruct Nothing fields)
+
+
 -- no support for extensible types yet
 -- no support for named records yet
-parseRecordBlock :: ReadP ElmConstruct
+parseRecordBlock :: ReadP [(String, ElmConstruct)]
 parseRecordBlock = do
+    skipSpaces
     satisfy (\char -> char == '{')
     skipSpaces
     fields <- sepBy1 parseFieldDeclaration fieldSeparator
     skipSpaces
     satisfy (\char -> char == '}')
-    return (ElmRecordConstruct Nothing fields)
+    return fields
     
 -- includes field separator character ',' for fields 1..n
 fieldSeparator :: ReadP Char
