@@ -17,46 +17,50 @@ parseString :: String -> [(ElmType, String)]
 parseString s =
     readP_to_S parseElmType s
 
-
 parseElmType :: ReadP ElmType
-parseElmType = do
-    (name, alias) <- lhs
+parseElmType =
+    parseNoAlias +++ parseWithAlias
+
+parseNoAlias :: ReadP ElmType
+parseNoAlias = do
+    name <- lhs
     skipSpaces
     char '='
     skipSpaces
-    case alias of
-        True -> do
-            { rhs <- constructorRoot +++ parseAnonRecord
-            ; return (ElmAlias name rhs)
-            }
-        False -> do
-            { rhs <- sumtypeRHS
-            ; return (ElmNewType name rhs)
-            }
+    rhs <- sumtypeRHS
+    return (ElmNewType name rhs)
+
+parseWithAlias :: ReadP ElmType
+parseWithAlias = do
+    name <- lhsAlias
+    skipSpaces
+    char '='
+    skipSpaces
+    rhs <- constructorRoot +++ parseAnonRecord
+    return (ElmAlias name rhs)
 
 -- parsers for the left hand side of a type declaration
-lhs :: ReadP (String, Bool)
+lhs :: ReadP String
 lhs = do
     skipSpaces
     string "type"
-    -- not sure if this makes a difference
-    -- alias <- parseAlias +++ false
-    alias <- parseAlias <++ false
     skipSpaces
     name <- parseTypeName
-    -- skipSpaces
-    -- TODO: add support for type variables here
-    return (name, alias)
+    return name
 
-false :: ReadP Bool
-false = do
-    return False
+lhsAlias :: ReadP String
+lhsAlias = do
+    skipSpaces
+    string "type"
+    parseAlias
+    skipSpaces
+    name <- parseTypeName
+    return name
 
-parseAlias :: ReadP Bool
+parseAlias :: ReadP String
 parseAlias = do
     skipSpaces
     string "alias"
-    return True
 
 
 -- parsers for the rhs of a sum type declaration: several different constructors
