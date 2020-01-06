@@ -32,14 +32,22 @@ import Data.Set (Set)
 
 
 
--- elmBasics :: Set ElmType
--- elmBasics =  ["Maybe", "Result", "Tuple", "Cmd", "Sub", "Program"]
+-- add Parameterized Types once support for them is implemented
+-- parameterized :: Set ElmType
+-- parameterized =  ["Maybe", "Result", "Tuple", "List"]
 
 -- all basics that take to type parameters and are constructed directly from literals
-elmPrimitives :: Set ElmType
-elmPrimitives =
+primitives :: Set ElmType
+primitives =
     map (\s -> ElmNewType s []) ["Int", "Float", "Bool", "String", "Char"] 
     & Data.Set.fromList
+
+platformPrimitives :: Set ElmType
+platformPrimitives =
+    map (\s -> ElmNewType s []) ["Program", "Cmd", "Sub"]
+    & Data.Set.fromList
+
+
 
 
 
