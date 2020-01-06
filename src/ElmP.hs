@@ -2,10 +2,12 @@ module ElmP
     ( parseElmType
     , ElmType (..)
     , ElmConstruct (..)
+    , TypeParam (..)
     , parseString
     ) where
 
 import Text.ParserCombinators.ReadP
+
 
 data ElmType =
     -- ElmNewtype name variants
@@ -16,10 +18,20 @@ data ElmType =
 
 data ElmConstruct =
     -- ElmConstruct name typeVars
-    ElmConstruct String [ElmConstruct]
+    ElmConstruct String [TypeParam]
     -- ElmRecordConstruct (maybe name) [(fieldname, fieldType)]
-    | ElmRecordConstruct (Maybe String) [(String, ElmConstruct)]
+    | ElmRecordConstruct (Maybe String) [(String, TypeParam)]
     deriving (Eq, Ord, Show)
+
+
+-- A TypeParam can represent either
+--    - a type variable: `a` in `(List a)`
+--    - a type constant: `String` in `(List String)`
+-- the parser can't know which kind it is though, so creating a sum type at this point doesn't make sense
+-- Which kind of type param it is will have to be determined by validating the AST later
+data TypeParam = TypeParam String [TypeParam]
+    deriving (Eq, Ord, Show)
+
 
 parseString :: String -> [(ElmType, String)]
 parseString s =
@@ -44,7 +56,7 @@ parseWithAlias = do
     skipSpaces
     char '='
     skipSpaces
-    rhs <- constructorRoot +++ parseAnonRecord
+    rhs <- constructorWithTypeParams +++ parseAnonRecord
     return (ElmAlias name rhs)
 
 -- parsers for the left hand side of a type declaration
@@ -70,16 +82,16 @@ parseAlias = do
     skipSpaces
     string "alias"
 
+---------------------------------------
 
 -- parsers for the rhs of a sum type declaration: several different constructors
-type SumTypeRHS = [ElmConstruct]
 
 -- parses a sumtypeRHS
 -- a | b | c
-sumtypeRHS :: ReadP SumTypeRHS
+sumtypeRHS :: ReadP [ElmConstruct]
 sumtypeRHS = do
     skipSpaces
-    types <- sepBy1 (constructorRoot +++ parseNamedRecord) pipe
+    types <- sepBy1 (constructorWithTypeParams +++ parseNamedRecord) pipe
     return types
 
 -- parses if next non-whitespace character is a pipe
@@ -87,6 +99,7 @@ pipe = do
     skipSpaces
     char '|'
 
+---------------------------------------
     
 -- parsers for the following type parameter associativity
 -- A
@@ -99,25 +112,38 @@ pipe = do
 -- ElmConstruct A [(ElmConstruct B [ElmConstruct C []])]
 
 -- parses a single constructor with all its type variables or constants
-constructorRoot = withTypeVars +++ parantheses constructorRoot
-
--- type variables can only have their own type variables if surrounded by parantheses
-constructorVariable = noTypeVars +++ parantheses constructorRoot
-
--- parses a constructor that can have type variables or type constants
-withTypeVars :: ReadP ElmConstruct
-withTypeVars = do
+-- parses a constructor that can have type parameters
+constructorWithTypeParams :: ReadP ElmConstruct
+constructorWithTypeParams = do
     skipSpaces
     name <- parseTypeName
-    vars <- many constructorVariable
+    vars <- many typeParam
     return (ElmConstruct name vars)
 
--- parses a constructor that can *not* have type variables or type constants
-noTypeVars :: ReadP ElmConstruct
-noTypeVars = do
+typeParamRoot :: ReadP TypeParam
+typeParamRoot = typeParamWithTypeParams +++ parantheses typeParamRoot
+
+-- type variables can only have their own type variables if surrounded by parantheses
+typeParam :: ReadP TypeParam
+typeParam = typeParamNoTypeParams +++ parantheses typeParamRoot
+
+
+
+-- parses a type parameter that can have its own type parameters
+typeParamWithTypeParams :: ReadP TypeParam
+typeParamWithTypeParams = do
     skipSpaces
     name <- parseTypeName
-    return (ElmConstruct name [])
+    vars <- many typeParam
+    return (TypeParam name vars)
+
+
+-- parses a constructor that can *not* have type parameters
+typeParamNoTypeParams :: ReadP TypeParam
+typeParamNoTypeParams = do
+    skipSpaces
+    name <- parseTypeName
+    return (TypeParam name [])
 
 -- parses parantheses
 parantheses p = do
@@ -136,6 +162,7 @@ parseTypeName = do
     remainingLetters <- many (satisfy (\char -> char >= 'A' && char <= 'z'))
     return (capitalLetter : remainingLetters)
 
+---------------------------------------
 
 -- parsers for elm records
 
@@ -156,7 +183,7 @@ parseAnonRecord = do
 
 -- no support for extensible types yet
 -- no support for named records yet
-parseRecordBlock :: ReadP [(String, ElmConstruct)]
+parseRecordBlock :: ReadP [(String, TypeParam)]
 parseRecordBlock = do
     skipSpaces
     satisfy (\char -> char == '{')
@@ -172,14 +199,14 @@ fieldSeparator = do
     satisfy (\char -> char == ',')
 
 -- no support for fields of types with associated types yet
-parseFieldDeclaration :: ReadP (String, ElmConstruct)
+parseFieldDeclaration :: ReadP (String, TypeParam)
 parseFieldDeclaration = do
     skipSpaces
     fieldname <- parseFieldName
     skipSpaces
     satisfy (\char -> char == ':')
     skipSpaces
-    fieldtype <- constructorRoot
+    fieldtype <- typeParamRoot
     skipSpaces
     return (fieldname, fieldtype)
 

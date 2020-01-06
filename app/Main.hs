@@ -2,7 +2,7 @@ module Main where
 
 import qualified ElmP
 
-example = "type Foo = Bar | Baz { id : Int}"
+example = "type Foo = Bar (List String) | Baz { id : Int}"
 
 main :: IO ()
 main = do
