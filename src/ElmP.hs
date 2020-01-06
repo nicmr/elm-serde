@@ -1,6 +1,7 @@
 module ElmP
     ( parseElmType
-    , ElmType
+    , ElmType (..)
+    , ElmConstruct (..)
     , parseString
     ) where
 
@@ -11,7 +12,14 @@ data ElmType =
     ElmNewType String [ElmConstruct]
     -- ElmAlias name aliasTo
     | ElmAlias String ElmConstruct
-    deriving Show
+    deriving (Eq, Ord, Show)
+
+data ElmConstruct =
+    -- ElmConstruct name typeVars
+    ElmConstruct String [ElmConstruct]
+    -- ElmRecordConstruct (maybe name) [(fieldname, fieldType)]
+    | ElmRecordConstruct (Maybe String) [(String, ElmConstruct)]
+    deriving (Eq, Ord, Show)
 
 parseString :: String -> [(ElmType, String)]
 parseString s =
@@ -79,12 +87,6 @@ pipe = do
     skipSpaces
     char '|'
 
-
-data ElmConstruct =
-    -- ElmConstruct name typeVars
-    ElmConstruct String [ElmConstruct]
-    -- ElmRecordConstruct (maybe name) [(fieldname, fieldType)]
-    | ElmRecordConstruct (Maybe String) [(String, ElmConstruct)] deriving Show
     
 -- parsers for the following type parameter associativity
 -- A
