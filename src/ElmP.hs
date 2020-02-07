@@ -7,9 +7,12 @@ module ElmP
     ) where
 
 import Text.ParserCombinators.ReadP
+import qualified Data.Map.Strict as MapStrict
+import Data.Map.Strict (Map)
 
 
 data ElmType =
+    -- TODO: should possibly renamed to CustomType for clarification
     -- ElmNewtype name variants
     ElmNewType String [ElmConstruct]
     -- ElmAlias name aliasTo

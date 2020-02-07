@@ -1,8 +1,13 @@
 module Validator
-    (
-        -- validate
-    )
     where
+
+
+-- module Validator
+-- (
+--     -- validate
+-- )
+-- where
+
 
 import Data.Function ((&))
 
@@ -10,6 +15,8 @@ import ElmP (ElmType(..), ElmConstruct(..))
 import qualified Data.Set
 import Data.Set (Set)
 
+import qualified Data.Map.Strict as MapS
+import Data.Map.Strict (Map)
 
 -- from: https://package.elm-lang.org/packages/elm/core/latest/
 -- Default Imports
@@ -48,10 +55,41 @@ platformPrimitives =
     & Data.Set.fromList
 
 
+data Decoder = Decoder {
+    elmModule :: String,
+    name :: String
+}
+
+-- qualifiedImport :: Decoder ->
+-- qualifiedImport decoder existingImports =
+--     , name decoder)
+    
+
+--  Map String (Set String) -> (Map String (Set String) , String)
 
 
+primitiveDecoders :: Map ElmType Decoder
+primitiveDecoders =
+    [ ( ElmNewType "Int" [], Decoder { elmModule="Json.Decode", name="int"})
+    , ( ElmNewType "Float" [], Decoder { elmModule="Json.Decode", name="float"})
+    , ( ElmNewType "Bool" [], Decoder { elmModule="Json.Decode", name="bool"})
+    , ( ElmNewType "String" [], Decoder { elmModule="Json.Decode", name="float"})
+    , ( ElmNewType "Char" [], Decoder { elmModule="Json.Decode", name="string"}) --TODO: Decide what to do with Chars
+    ]
+    & MapS.fromList
 
--- validate :: Set ElmType -> [ElmType] -> Some [ElmType]
--- validate basics elmTypes =
+writeDecoder :: ElmType -> Map ElmType Decoder -> Maybe String
+writeDecoder elmtype decoders =
+    case MapS.lookup elmtype decoders of
+        Just (decoder) ->
+            Just $ name decoder
+        Nothing ->
+            Nothing
 
-
+writeQualifiedDecoder :: ElmType -> Map ElmType Decoder -> Maybe String
+writeQualifiedDecoder elmtype decoders =
+    case MapS.lookup elmtype decoders of
+        Just (decoder) ->
+            Just $ (elmModule decoder) ++ "." ++ (name decoder)
+        Nothing ->
+            Nothing
