@@ -32,6 +32,8 @@ main = do
 
 
     exampleSrc <- readFile "examples/Example.elm"
+    putStrLn "file contents:"
+    putStrLn exampleSrc
     let (parsedTypes, _) = last $ Parser.parseString exampleSrc
     putStrLn "Parsing Elm types..."
     print parsedTypes

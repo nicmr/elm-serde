@@ -92,11 +92,11 @@ writeDecoder elmtype decoders =
             case elmtype of
                 ElmCustomType name constructors ->
                     --stub
-                    err "Not yet implemented"
+                    err "Non-record custom types not yet implemented"
                 ElmAlias name constructor ->
                     case constructor of
                         ElmConstruct name typeParams ->
-                            err "Not yet implemented"
+                            err "Elm type aliases not yet implemented"
                         ElmRecordConstruct maybeName fields -> -- fields: [(String, TypeParam)]
                             let len = length fields
                             in
