@@ -11,10 +11,10 @@ module Validator
 
 import Data.Function ((&))
 
-import ElmP (ElmType(..), ElmConstruct(..))
+import ElmP (ElmType(..), ElmConstruct(..), TypeParam(..))
 import qualified Data.Set
 import Data.Set (Set)
-
+import Data.Either
 import qualified Data.Map.Strict as MapS
 import Data.Map.Strict (Map)
 
@@ -46,12 +46,12 @@ import Data.Map.Strict (Map)
 -- all basics that take to type parameters and are constructed directly from literals
 primitives :: Set ElmType
 primitives =
-    map (\s -> ElmNewType s []) ["Int", "Float", "Bool", "String", "Char"] 
+    map (\s -> ElmCustomType s []) ["Int", "Float", "Bool", "String", "Char"] 
     & Data.Set.fromList
 
 platformPrimitives :: Set ElmType
 platformPrimitives =
-    map (\s -> ElmNewType s []) ["Program", "Cmd", "Sub"]
+    map (\s -> ElmCustomType s []) ["Program", "Cmd", "Sub"]
     & Data.Set.fromList
 
 
@@ -70,26 +70,55 @@ data Decoder = Decoder {
 
 primitiveDecoders :: Map ElmType Decoder
 primitiveDecoders =
-    [ ( ElmNewType "Int" [], Decoder { elmModule="Json.Decode", name="int"})
-    , ( ElmNewType "Float" [], Decoder { elmModule="Json.Decode", name="float"})
-    , ( ElmNewType "Bool" [], Decoder { elmModule="Json.Decode", name="bool"})
-    , ( ElmNewType "String" [], Decoder { elmModule="Json.Decode", name="float"})
-    , ( ElmNewType "Char" [], Decoder { elmModule="Json.Decode", name="string"}) --TODO: Decide what to do with Chars
+    [ ( ElmCustomType "Int" [], Decoder { elmModule="Json.Decode", name="int"})
+    , ( ElmCustomType "Float" [], Decoder { elmModule="Json.Decode", name="float"})
+    , ( ElmCustomType "Bool" [], Decoder { elmModule="Json.Decode", name="bool"})
+    , ( ElmCustomType "String" [], Decoder { elmModule="Json.Decode", name="float"})
+    , ( ElmCustomType "Char" [], Decoder { elmModule="Json.Decode", name="string"}) --TODO: Decide what to do with Chars
     ]
     & MapS.fromList
 
-writeDecoder :: ElmType -> Map ElmType Decoder -> Maybe String
+
+data EmitterError =
+    Error String
+
+writeDecoder :: ElmType -> Map ElmType Decoder -> Either EmitterError String
 writeDecoder elmtype decoders =
     case MapS.lookup elmtype decoders of
         Just (decoder) ->
-            Just $ name decoder
+            Right $ name decoder
         Nothing ->
-            Nothing
+            case elmtype of
+                ElmCustomType name constructors ->
+                    --stub
+                    error "Not yet implemented"
+                ElmAlias name constructor ->
+                    case constructor of
+                        ElmConstruct name typeParams ->
+                            err "Not yet implemented"
+                        ElmRecordConstruct maybeName fields -> -- fields: [(String, TypeParam)]
+                            let len = length fields
+                            in
+                            if len == 0 then
+                                err "Zero field record not yet implemented"
+                            else if len == 1 then
+                                err "One field record not yet implemented"
+                            else if len `elem` [2..8] then
+                                let elmMap = "map" ++ (show len)
+                                    fieldDecoders = foldl (\acc (name, TypeParam paramName typeParams) -> acc ++ "\n" ++ ("(field \"" ++ name ++ "\" " ++ paramName ++ ")") ) [] fields
+                                in
+                                    Right $ elmMap ++ " " ++ name ++ fieldDecoders
+                            else err "Records with more than 8 fields not yet implemented"
 
-writeQualifiedDecoder :: ElmType -> Map ElmType Decoder -> Maybe String
-writeQualifiedDecoder elmtype decoders =
-    case MapS.lookup elmtype decoders of
-        Just (decoder) ->
-            Just $ (elmModule decoder) ++ "." ++ (name decoder)
-        Nothing ->
-            Nothing
+    where err = Left . Error
+
+
+-- decoderFold :: (String, TypeParam) -> [String] 
+
+-- writeQualifiedDecoder :: ElmType -> Map ElmType Decoder -> Maybe String
+-- writeQualifiedDecoder elmtype decoders =
+--     case MapS.lookup elmtype decoders of
+--         Just (decoder) ->
+--             Just $ (elmModule decoder) ++ "." ++ (name decoder)
+--         Nothing ->
+--             Nothing

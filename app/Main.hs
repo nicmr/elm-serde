@@ -4,7 +4,8 @@ import qualified ElmP
 import qualified Validator
 import ElmP (ElmType(..))
 
-import Data.Maybe (fromMaybe)
+-- import Data.Maybe (fromMaybe)
+import Data.Either (fromRight)
 
 
 ex1 = "type Foo = Bar (List String) | Baz { id : Int}"
@@ -18,16 +19,15 @@ main = do
     putStrLn ex1
     putStrLn "Parsing ex1..."
 
+    let generated = fromRight "fail" $ Validator.writeDecoder (ElmCustomType "Float" []) (Validator.primitiveDecoders)
+    putStrLn generated
+
     let (parsed2, rest2) = last $ ElmP.parseString ex2
     putStrLn ex2
     putStrLn "Parsing ex2.."
     print parsed2
 
-    let generated = fromMaybe "fail" $ Validator.writeDecoder (ElmNewType "Float" []) (Validator.primitiveDecoders)
-    putStrLn generated
-
-
-    let generated2 = fromMaybe "fail2" $ Validator.writeDecoder (parsed2) (Validator.primitiveDecoders)
+    let generated2 = fromRight "fail2" $ Validator.writeDecoder (parsed2) (Validator.primitiveDecoders)
     putStrLn generated2
 
     return ()

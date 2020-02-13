@@ -13,8 +13,8 @@ import Data.Map.Strict (Map)
 
 data ElmType =
     -- TODO: should possibly renamed to CustomType for clarification
-    -- ElmNewtype name variants
-    ElmNewType String [ElmConstruct]
+    -- ElmCustomType name variants
+    ElmCustomType String [ElmConstruct]
     -- ElmAlias name aliasTo
     | ElmAlias String ElmConstruct
     deriving (Eq, Ord, Show)
@@ -51,7 +51,7 @@ parseNoAlias = do
     char '='
     skipSpaces
     rhs <- sumtypeRHS
-    return (ElmNewType name rhs)
+    return (ElmCustomType name rhs)
 
 parseWithAlias :: ReadP ElmType
 parseWithAlias = do
