@@ -1,4 +1,4 @@
-module ElmP
+module Elm.Serde.Parser
     ( parseElmType
     , ElmType (..)
     , ElmConstruct (..)
@@ -7,35 +7,36 @@ module ElmP
     ) where
 
 import Text.ParserCombinators.ReadP
+import qualified Data.Map.Strict as MapStrict
+import Data.Map.Strict (Map)
 
+import Elm.Serde
 
-data ElmType =
-    -- ElmNewtype name variants
-    ElmNewType String [ElmConstruct]
-    -- ElmAlias name aliasTo
-    | ElmAlias String ElmConstruct
-    deriving (Eq, Ord, Show)
-
-data ElmConstruct =
-    -- ElmConstruct name typeVars
-    ElmConstruct String [TypeParam]
-    -- ElmRecordConstruct (maybe name) [(fieldname, fieldType)]
-    | ElmRecordConstruct (Maybe String) [(String, TypeParam)]
-    deriving (Eq, Ord, Show)
-
-
--- A TypeParam can represent either
---    - a type variable: `a` in `(List a)`
---    - a type constant: `String` in `(List String)`
--- the parser can't know which kind it is though, so creating a sum type at this point doesn't make sense
--- Which kind of type param it is will have to be determined by validating the AST later
-data TypeParam = TypeParam String [TypeParam]
-    deriving (Eq, Ord, Show)
-
-
-parseString :: String -> [(ElmType, String)]
+parseString :: String -> [([ElmType], String)]
 parseString s =
-    readP_to_S parseElmType s
+    readP_to_S parseSource s
+
+
+parseSource :: ReadP [ElmType]
+parseSource = do
+    allTypes <- many parseElmTypesIgnoreComments 
+    return $ concat allTypes
+
+
+parseElmTypesIgnoreComments :: ReadP [ElmType]
+parseElmTypesIgnoreComments = do
+    optional (many parseComment)
+    someTypes <- many1 parseElmType
+    return someTypes
+
+
+parseComment :: ReadP String
+parseComment = do
+    skipSpaces
+    string "--"
+    comment <- many $ satisfy (\c -> c /= '\n')
+    char '\n'
+    return comment
 
 parseElmType :: ReadP ElmType
 parseElmType =
@@ -48,7 +49,7 @@ parseNoAlias = do
     char '='
     skipSpaces
     rhs <- sumtypeRHS
-    return (ElmNewType name rhs)
+    return (ElmCustomType name rhs)
 
 parseWithAlias :: ReadP ElmType
 parseWithAlias = do
