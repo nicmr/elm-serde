@@ -1,4 +1,4 @@
-module Validator
+module Elm.Serde.Emitter
     where
 
 
@@ -11,7 +11,7 @@ module Validator
 
 import Data.Function ((&))
 
-import ElmP (ElmType(..), ElmConstruct(..), TypeParam(..))
+import Elm.Serde
 import qualified Data.Set
 import Data.Set (Set)
 import Data.Either
@@ -111,9 +111,6 @@ writeDecoder elmtype decoders =
                             else err "Records with more than 8 fields not yet implemented"
 
     where err = Left . Error
-
-
--- decoderFold :: (String, TypeParam) -> [String] 
 
 -- writeQualifiedDecoder :: ElmType -> Map ElmType Decoder -> Maybe String
 -- writeQualifiedDecoder elmtype decoders =
