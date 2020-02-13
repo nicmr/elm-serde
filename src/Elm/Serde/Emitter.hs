@@ -81,6 +81,7 @@ primitiveDecoders =
 
 data EmitterError =
     Error String
+    deriving (Show)
 
 writeDecoder :: ElmType -> Map ElmType Decoder -> Either EmitterError String
 writeDecoder elmtype decoders =
@@ -91,7 +92,7 @@ writeDecoder elmtype decoders =
             case elmtype of
                 ElmCustomType name constructors ->
                     --stub
-                    error "Not yet implemented"
+                    err "Not yet implemented"
                 ElmAlias name constructor ->
                     case constructor of
                         ElmConstruct name typeParams ->

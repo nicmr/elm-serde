@@ -12,9 +12,31 @@ import Data.Map.Strict (Map)
 
 import Elm.Serde
 
-parseString :: String -> [(ElmType, String)]
+parseString :: String -> [([ElmType], String)]
 parseString s =
-    readP_to_S parseElmType s
+    readP_to_S parseSource s
+
+
+parseSource :: ReadP [ElmType]
+parseSource = do
+    allTypes <- many parseElmTypesIgnoreComments 
+    return $ concat allTypes
+
+
+parseElmTypesIgnoreComments :: ReadP [ElmType]
+parseElmTypesIgnoreComments = do
+    optional (many parseComment)
+    someTypes <- many1 parseElmType
+    return someTypes
+
+
+parseComment :: ReadP String
+parseComment = do
+    skipSpaces
+    string "--"
+    comment <- many $ satisfy (\c -> c /= '\n')
+    char '\n'
+    return comment
 
 parseElmType :: ReadP ElmType
 parseElmType =

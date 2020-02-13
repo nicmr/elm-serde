@@ -1,4 +1,4 @@
-module Example
+-- module Example
 
 -- basic sum type
 type Roast = Dark | Medium | Light
