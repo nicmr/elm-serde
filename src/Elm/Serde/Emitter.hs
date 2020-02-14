@@ -83,8 +83,26 @@ data EmitterError =
     Error String
     deriving (Show)
 
-writeDecoder :: ElmType -> Map ElmType Decoder -> Either EmitterError String
-writeDecoder elmtype decoders =
+
+data Config = Config {
+    sumTagging :: SumTaggingConfig
+}
+
+data SumTaggingConfig = Internal | External
+
+
+
+-- more ergonomic version of writeDecoder, with primitive decoders baked in
+-- to be exposed in public interface
+createDecoder :: ElmType -> Config -> Either EmitterError String
+createDecoder elmtype config =
+    writeDecoder elmtype config primitiveDecoders
+
+
+-- internal version of createDecode
+-- possibly move to Internal submodue at a later point
+writeDecoder :: ElmType -> Config -> Map ElmType Decoder -> Either EmitterError String
+writeDecoder elmtype config decoders =
     case MapS.lookup elmtype decoders of
         Just (decoder) ->
             Right $ name decoder
@@ -92,7 +110,14 @@ writeDecoder elmtype decoders =
             case elmtype of
                 ElmCustomType name constructors ->
                     --stub
-                    err "Non-record custom types not yet implemented"
+                    -- err "Non-record custom types not yet implemented"
+                    case sumTagging config of
+                        Internal ->
+                            Right $ fieldDecoder "type" "String"
+                            -- TODO: write function that transforms string into maybe (type variant), write fail case for decoder if Nothing
+                        External ->
+                            Right $ fieldDecoder name "Value"
+                            -- TODO: value then needs to be decoded with the decoders for the different type parameters of the type
                 ElmAlias name constructor ->
                     case constructor of
                         ElmConstruct name typeParams ->
@@ -112,6 +137,13 @@ writeDecoder elmtype decoders =
                             else err "Records with more than 8 fields not yet implemented"
 
     where err = Left . Error
+
+
+
+fieldDecoder :: String -> String -> String
+fieldDecoder fieldName fieldType = 
+    "(field \"" ++ fieldName ++ "\" " ++ fieldType ++ ")"
+
 
 -- writeQualifiedDecoder :: ElmType -> Map ElmType Decoder -> Maybe String
 -- writeQualifiedDecoder elmtype decoders =
