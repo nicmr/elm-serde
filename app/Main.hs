@@ -23,4 +23,9 @@ main = do
     let decoders = map (\t -> Emitter.createDecoder t (Emitter.Config{ sumTagging = External}) ) parsedTypes
     print decoders
 
+    let output = foldl (\acc result -> case result of
+            Left _ -> acc
+            Right decoder -> acc ++ "\n" ++ decoder) [] decoders
+    putStrLn output
+
     return ()

@@ -1,22 +1,16 @@
 module Elm.Serde.Emitter
     where
 
-
--- module Validator
--- (
---     -- validate
--- )
--- where
-
-
 import Data.Function ((&))
 
 import Elm.Serde
+
 import qualified Data.Set
 import Data.Set (Set)
 import Data.Either
 import qualified Data.Map.Strict as MapS
 import Data.Map.Strict (Map)
+import Data.Char (toLower)
 
 -- from: https://package.elm-lang.org/packages/elm/core/latest/
 -- Default Imports
@@ -109,14 +103,16 @@ writeDecoder elmtype config decoders =
         Nothing ->
             case elmtype of
                 ElmCustomType name constructors ->
-                    --stub
-                    -- err "Non-record custom types not yet implemented"
+                    -- get signature and base of definition
+                    let functionBase = (functionSignature name) ++ "\n" ++ (functionDefinition name)
+                    in
+                    -- then write body
                     case sumTagging config of
                         Internal ->
-                            Right $ fieldDecoder "type" "String"
+                            Right $ functionBase ++ fieldDecoder "type" "String"
                             -- TODO: write function that transforms string into maybe (type variant), write fail case for decoder if Nothing
                         External ->
-                            Right $ fieldDecoder name "Value"
+                            Right $ functionBase ++ fieldDecoder name "Value"
                             -- TODO: value then needs to be decoded with the decoders for the different type parameters of the type
                 ElmAlias name constructor ->
                     case constructor of
@@ -138,7 +134,13 @@ writeDecoder elmtype config decoders =
 
     where err = Left . Error
 
+functionSignature :: String -> String
+functionSignature typeToDecode =
+    (map toLower typeToDecode) ++ " : Decoder " ++ typeToDecode
 
+functionDefinition :: String -> String
+functionDefinition typeToDecode =
+    (map toLower typeToDecode) ++ " = \n"
 
 fieldDecoder :: String -> String -> String
 fieldDecoder fieldName fieldType = 
